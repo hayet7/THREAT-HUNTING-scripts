@@ -14,26 +14,34 @@ Set-Location $cheminReleases
 Write-Host "Exécution de Hoarder..."
 .\hoarder.exe -vv
 
-# Attendre quelques secondes pour être sûr que le fichier soit généré
-Start-Sleep -Seconds 3
+# URL du serveur Django pour recevoir le fichier
+$Uri = "http://localhost:8000/upload_resultat/"
 
-# Chercher le dernier fichier ZIP généré dans le dossier releases
-$fichierGenere = Get-ChildItem -Path $cheminReleases -Filter *.zip -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+# Chemin vers le dossier où Hoarder génère le fichier ZIP
+$HoarderFolder = "$env:USERPROFILE\Downloads\Hoarder\releases"  # Utilisation de la variable d'environnement USERPROFILE
 
-if ($null -eq $fichierGenere) {
-    Write-Host "Aucun fichier généré trouvé dans le dossier 'releases'."
-    exit
-}
+# Trouver le fichier ZIP généré dans le dossier Hoarder
+$FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
-# Envoyer le fichier à Django (URL de ton API)
-$destinationDjango = "http://127.0.0.1:8000/api/upload_resultat/"
+# Vérifie si un fichier ZIP a été trouvé
+if ($FichierPath) {
+    Write-Host "Fichier trouvé : $($FichierPath.FullName)"
+    
+    # Lire le fichier en binaire
+    $Fichier = Get-Content -Path $FichierPath.FullName -Encoding Byte
 
-# Envoi du fichier à Django via HTTP POST
-$response = Invoke-WebRequest -Uri $destinationDjango `
-    -Method Post `
-    -Form @{
-        "fichier" = Get-Item $fichierGenere.FullName
+    # Créer l'objet multipart/form-data pour envoyer le fichier
+    $Body = @{
+        fichier = [System.IO.MemoryStream]::new($Fichier)
     }
 
-Write-Host "✅ Fichier $($fichierGenere.Name) envoyé à Django avec succès."
-Write-Host "Réponse du serveur Django : $($response.Content)"
+    # Envoyer le fichier à Django
+    try {
+        $response = Invoke-RestMethod -Uri $Uri -Method Post -ContentType "multipart/form-data" -Body $Body
+        Write-Host "Réponse du serveur Django : $($response)"
+    } catch {
+        Write-Host "Erreur lors de l'envoi du fichier : $_"
+    }
+} else {
+    Write-Host "Aucun fichier ZIP trouvé dans le dossier Hoarder"
+}
