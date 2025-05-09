@@ -8,3 +8,7 @@ cd .\Hoarder\releases\
 
 # Exécuter hoarder.exe
 .\hoarder.exe -vv
+
+#recuperation .zip
+
+copy "C:\Users\$env:USERNAME\Downloads\Hoarder\releases\$env:COMPUTERNAME.zip" "C:\Users\$env:USERNAME\pfe\threat_hunting\threat_hunting\media\hoarder_zips\"
