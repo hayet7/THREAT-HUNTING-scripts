@@ -1,38 +1,30 @@
-# Variables
-$destinationDjango = "http://192.168.1.100:8000/api/upload_resultat/"
-$cheminProjet = "$env:USERPROFILE\Downloads\Hoarder"
-$cheminReleases = "$cheminProjet\releases"
-$hoarderExe = "$cheminReleases\hoarder.exe"
+# Télécharger Hoarder depuis GitHub
+cd $env:USERPROFILE\Downloads
+git clone https://github.com/DFIRKuiper/Hoarder.git
 
-# Cloner Hoarder si nécessaire
-if (!(Test-Path $cheminProjet)) {
-    git clone https://github.com/DFIRKuiper/Hoarder.git $cheminProjet
-}
 
 # Aller dans le dossier releases
-Set-Location $cheminReleases
+cd .\Hoarder\releases\
 
-# Exécuter Hoarder
-& $hoarderExe -vv
+# Exécuter hoarder.exe
+.\hoarder.exe -vv 
 
-# Attendre un peu si nécessaire (dépend du système)
-Start-Sleep -Seconds 3
+# Attendre un peu que les fichiers se génèrent
+Start-Sleep -Seconds 2
 
-# Chercher le dernier fichier généré (ex: fichier zip)
-$fichierGenere = Get-ChildItem -Path $cheminReleases -Filter *.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+# Chercher le dernier fichier généré dans le dossier releases (ZIP, JSON, etc.)
+$fichierGenere = Get-ChildItem -Path . -Include *.zip, *.csv, *.json -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 if ($null -eq $fichierGenere) {
     Write-Host "Aucun fichier généré trouvé."
     exit
 }
 
-# Envoi à Django
-$response = Invoke-WebRequest -Uri $destinationDjango `
+# Envoyer le fichier à ton backend Django
+Invoke-WebRequest -Uri "http://http:/127.0.0.1:8000/api/upload_resultat/" `
     -Method Post `
     -Form @{
         "fichier" = Get-Item $fichierGenere.FullName
     }
 
-Write-Host "Fichier envoyé, réponse du serveur : $($response.Content)"
-
-
+Write-Host "Fichier $($fichierGenere.Name) envoyé à Django."
