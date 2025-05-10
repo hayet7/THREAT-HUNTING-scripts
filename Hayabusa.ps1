@@ -59,9 +59,9 @@ if (Test-Path -Path $csvFilePath) {
     # URL de l'endpoint Django pour l'upload
     $url = "http://localhost:8000/upload_resultat/"  # Remplace par l'URL correcte de ton endpoint Django
 
-    # Utilisation de 'Invoke-RestMethod' avec l'option -Form pour envoyer le fichier
+    # Utilisation de 'Invoke-WebRequest' avec l'option -Form pour envoyer le fichier
     try {
-        $response = Invoke-RestMethod -Uri $url -Method Post -Form @{
+        $response = Invoke-WebRequest -Uri $url -Method Post -Form @{
             "fichier" = Get-Item -Path $csvFilePath
         }
         Write-Host "[+] Fichier téléchargé et enregistré avec succès."
