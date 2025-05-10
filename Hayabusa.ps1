@@ -50,7 +50,7 @@ if (Test-Path -Path $hayabusaExe) {
     Write-Host "[✗] Erreur : hayabusa-3.0.1-win-x64.exe introuvable après extraction."
 }
 # Chemin vers le fichier CSV existant
-$csvFilePath = "$env:USERPROFILE\Downloads\hayabusa\resultat.csv"  # Assurez-vous que le chemin est correct
+$csvFilePath = "$env:USERPROFILE\Downloads\hayabusa\sec.csv"  # Assurez-vous que le chemin est correct
 
 # Vérifier si le fichier existe
 if (Test-Path -Path $csvFilePath) {
