@@ -49,3 +49,32 @@ if (Test-Path -Path $hayabusaExe) {
 } else {
     Write-Host "[✗] Erreur : hayabusa-3.0.1-win-x64.exe introuvable après extraction."
 }
+# Chemin vers le fichier CSV existant
+$csvFilePath = "$env:USERPROFILE\Downloads\hayabusa\resultat.csv"  # Assurez-vous que le chemin est correct
+
+# Vérifier si le fichier existe
+if (Test-Path -Path $csvFilePath) {
+    Write-Host "[+] Le fichier CSV a été trouvé, envoi en cours..."
+
+    # Lire le fichier CSV en binaire
+    $csvContent = [System.IO.File]::ReadAllBytes($csvFilePath)
+
+    # URL de l'endpoint Django pour l'upload
+    $url = "http://localhost:8000/upload_resultat/"  # Remplace par l'URL correcte de ton endpoint Django
+
+    # Préparer le corps de la requête pour l'upload (Base64 du contenu du fichier)
+    $body = @{
+        "fichier" = [Convert]::ToBase64String($csvContent)
+    }
+
+    # Envoyer la requête POST à Django pour enregistrer le fichier
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Post -Body $body -ContentType "application/json"
+        Write-Host "[+] Fichier téléchargé et enregistré avec succès."
+    } catch {
+        Write-Host "[✗] Erreur lors de l'envoi du fichier. Détails : $_"
+    }
+} else {
+    Write-Host "[✗] Erreur : Le fichier CSV n'a pas été trouvé à l'emplacement spécifié."
+}
+
