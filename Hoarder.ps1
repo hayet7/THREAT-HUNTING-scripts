@@ -18,7 +18,7 @@ Write-Host "Exécution de Hoarder..."
 $Uri = "http://localhost:8000/upload_resultat/"
 
 # Chemin vers le dossier où Hoarder génère le fichier ZIP
-$HoarderFolder = "$env:USERPROFILE\Downloads\Hoarder\releases"  # Utilisation de la variable d'environnement USERPROFILE
+$HoarderFolder = "$env:USERPROFILE\Downloads\Hoarder\releases"
 
 # Trouver le fichier ZIP généré dans le dossier Hoarder
 $FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1
