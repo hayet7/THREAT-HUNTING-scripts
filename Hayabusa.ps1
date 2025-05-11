@@ -59,29 +59,12 @@ if (Test-Path -Path $csvFilePath) {
     # URL de l'endpoint Django pour l'upload
     $url = "http://localhost:8000/upload_resultat/"  # Remplace par l'URL correcte de ton endpoint Django
 
-    # Créer le contenu multipart/form-data
-    $content = New-Object System.Net.Http.MultipartFormDataContent
-
-    # Lire le fichier CSV
-    $fileContent = [System.IO.File]::ReadAllBytes($csvFilePath)
-
-    # Ajouter le fichier à la requête
-    $fileContent = New-Object System.Net.Http.ByteArrayContent($fileContent)
-    $fileContent.Headers.Add("Content-Type", "application/octet-stream")
-
-    # Nom du champ de fichier dans le formulaire
-    $content.Add($fileContent, "fichier", (Get-Item -Path $csvFilePath).Name)
-
-    # Envoyer la requête POST avec le formulaire
+    # Utilisation de 'Invoke-RestMethod' avec l'option -Form pour envoyer le fichier
     try {
-        $client = New-Object System.Net.Http.HttpClient
-        $response = $client.PostAsync($url, $content).Result
-
-        if ($response.IsSuccessStatusCode) {
-            Write-Host "[+] Fichier téléchargé et enregistré avec succès."
-        } else {
-            Write-Host "[✗] Erreur lors de l'envoi du fichier. Code HTTP: $($response.StatusCode)"
+        $response = Invoke-RestMethod -Uri $url -Method Post -Form @{
+            "fichier" = Get-Item -Path $csvFilePath
         }
+        Write-Host "[+] Fichier téléchargé et enregistré avec succès."
     } catch {
         Write-Host "[✗] Erreur lors de l'envoi du fichier. Détails : $_"
     }
