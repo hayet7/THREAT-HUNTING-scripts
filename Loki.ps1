@@ -1,4 +1,4 @@
-# Définir les paramètres
+# Paramètres
 $downloadUrl = "https://github.com/Neo23x0/Loki/releases/download/v0.51.0/loki_0.51.0.zip"
 $downloadPath = "$env:USERPROFILE\Downloads\loki.zip"
 $extractBasePath = "$env:USERPROFILE\Downloads"
@@ -13,51 +13,72 @@ function Ensure-ExpandArchiveAvailable {
         Import-Module 'Microsoft.PowerShell.Archive'
     }
 }
-
-# Vérifier la présence d'Expand-Archive
 Ensure-ExpandArchiveAvailable
 
-# Télécharger Loki
-Write-Host "[+] Téléchargement de Loki depuis GitHub..."
-Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath
-
-# Supprimer ancien dossier si besoin
+# Supprimer ancien dossier Loki
 if (Test-Path -Path $lokiPath) {
     Write-Host "[+] Suppression de l'ancien dossier Loki..."
     Remove-Item -Path $lokiPath -Recurse -Force
 }
 
-# Extraire directement sous Downloads (pour avoir Downloads\loki\)
+# Supprimer ancien ZIP
+if (Test-Path -Path $downloadPath) {
+    Remove-Item -Path $downloadPath -Force
+}
+
+# Télécharger Loki
+Write-Host "[+] Téléchargement de Loki depuis GitHub..."
+Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath
+
+# Extraction
 Write-Host "[+] Extraction de l'archive Loki..."
 Expand-Archive -Path $downloadPath -DestinationPath $extractBasePath -Force
 
-# Définir les chemins pour signature-base
-$signatureSource = "$lokiPath\signature-base"
-$signatureDestination = "$lokiPath\signature-base"
-
-# Copier signature-base si nécessaire
-if (-not (Test-Path -Path $signatureDestination)) {
-    Write-Host "[+] Copie du dossier 'signature-base' vers le dossier Loki..."
-    $sourceCandidate = Get-ChildItem -Path $extractBasePath -Recurse -Directory -Filter "signature-base" | Select-Object -First 1
-    if ($sourceCandidate) {
-        Copy-Item -Path $sourceCandidate.FullName -Destination $signatureDestination -Recurse -Force
-    } else {
-        Write-Host "[✗] Erreur : Dossier 'signature-base' introuvable dans l'archive extraite."
-    }
-} else {
-    Write-Host "[+] Le dossier 'signature-base' est déjà en place."
-}
-
-# Vérifier si Loki.exe existe
+# Vérification de l'exécutable
 if (Test-Path -Path $lokiExe) {
-    # Exécuter Loki
     Write-Host "[+] Exécution de Loki..."
     Start-Process -FilePath $lokiExe -ArgumentList "--noindicator" -NoNewWindow -Wait
     Write-Host "[+] Analyse terminée."
 } else {
     Write-Host "[✗] Erreur : Loki.exe introuvable après extraction."
+    exit
 }
 
-# Nettoyage (Optionnel)
-# Write-Host "[+] Nettoyage des fichiers temporaires..."
-# Remove-Item -Path $downloadPath -Force
+# Chercher le fichier de rapport généré automatiquement (dans USERPROFILE)
+Write-Host "[+] Recherche du fichier de rapport Loki généré..."
+$reportFile = Get-ChildItem -Path "$env:USERPROFILE" -Filter "loki_*.txt" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+if ($reportFile -ne $null) {
+    Write-Host "[+] Rapport trouvé : $($reportFile.FullName)"
+    
+    # Préparation pour envoi à Django
+    $url = "http://localhost:8000/upload_resultat/"  # À adapter
+
+    $fileBytes = [System.IO.File]::ReadAllBytes($reportFile.FullName)
+    $fileName = $reportFile.Name
+    $boundary = [System.Guid]::NewGuid().ToString()
+    $LF = "`r`n"
+
+    $bodyLines = (
+        "--$boundary",
+        "Content-Disposition: form-data; name=`"fichier`"; filename=`"$fileName`"",
+        "Content-Type: text/plain$LF",
+        [System.Text.Encoding]::ASCII.GetString($fileBytes),
+        "--$boundary--$LF"
+    ) -join $LF
+
+    $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
+
+    $headers = @{
+        "Content-Type" = "multipart/form-data; boundary=$boundary"
+    }
+
+    try {
+        $response = Invoke-WebRequest -Uri $url -Method Post -Body $bodyBytes -Headers $headers
+        Write-Host "[+] Rapport envoyé avec succès."
+    } catch {
+        Write-Host "[✗] Erreur lors de l'envoi du rapport. Détails : $_"
+    }
+} else {
+    Write-Host "[✗] Erreur : Aucun rapport Loki *.txt trouvé dans le profil utilisateur."
+}
