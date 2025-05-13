@@ -14,34 +14,31 @@ Set-Location $cheminReleases
 Write-Host "Exécution de Hoarder..."
 .\hoarder.exe --PowerShellHistory -vv
 
-# URL du serveur Django pour recevoir le fichier
-$Uri = "http://localhost:8000/upload_resultat/"
-
-# Chemin vers le dossier où Hoarder génère le fichier ZIP
-$HoarderFolder = "$env:USERPROFILE\Downloads\Hoarder\releases"
-
-# Trouver le fichier ZIP généré dans le dossier Hoarder
-$FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+# Trouver le dernier fichier ZIP
+$FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
 
 # Vérifie si un fichier ZIP a été trouvé
 if ($FichierPath) {
-    Write-Host "Fichier trouvé : $($FichierPath.FullName)"
-    
-    # Lire le fichier en binaire
-    $Fichier = Get-Content -Path $FichierPath.FullName -Encoding Byte
+    Write-Host "[✓] Fichier trouvé : $($FichierPath.FullName)"
 
-    # Créer l'objet multipart/form-data pour envoyer le fichier
-    $Body = @{
-        fichier = [System.IO.MemoryStream]::new($Fichier)
+    # URL de l'endpoint Django
+    $Uri = "http://localhost:8000/upload_resultat/"
+
+    # Construction du formulaire (multipart/form-data automatique)
+    $Form = @{
+        "fichier" = Get-Item $FichierPath.FullName
     }
 
-    # Envoyer le fichier à Django
+    # Envoi avec Invoke-WebRequest
     try {
-        $response = Invoke-RestMethod -Uri $Uri -Method Post -ContentType "multipart/form-data" -Body $Body
-        Write-Host "Réponse du serveur Django : $($response)"
+        $response = Invoke-WebRequest -Uri $Uri -Method Post -Form $Form
+        Write-Host "[✓] Réponse du serveur Django : $($response.StatusCode) $($response.StatusDescription)"
+        Write-Host $response.Content
     } catch {
-        Write-Host "Erreur lors de l'envoi du fichier : $_"
+        Write-Host "[✗] Erreur lors de l'envoi : $_"
     }
 } else {
-    Write-Host "Aucun fichier ZIP trouvé dans le dossier Hoarder"
+    Write-Host "[✗] Aucun fichier ZIP trouvé dans $HoarderFolder"
 }
