@@ -1,40 +1,33 @@
-# === Configuration ===
-$hoarderRepo = "https://github.com/DFIRKuiper/Hoarder.git"
+# Télécharger Hoarder depuis GitHub (si ce n'est pas déjà fait)
 $cheminProjet = "$env:USERPROFILE\Downloads\Hoarder"
-$cheminReleases = "$cheminProjet\releases"
-$uploadUrl = "http://localhost:8000/upload_resultat/"  # À adapter si besoin
-
-# === Étape 1 : Cloner Hoarder s'il n'existe pas ===
 if (-Not (Test-Path $cheminProjet)) {
-    Write-Host "[+] Clonage du dépôt Hoarder..."
-    git clone $hoarderRepo $cheminProjet
-} else {
-    Write-Host "[✓] Le dépôt Hoarder existe déjà."
+    git clone https://github.com/DFIRKuiper/Hoarder.git $cheminProjet
 }
 
-# === Étape 2 : Exécuter hoarder.exe ===
-if (Test-Path "$cheminReleases\hoarder.exe") {
-    Write-Host "[+] Exécution de Hoarder..."
-    Set-Location $cheminReleases
-    .\hoarder.exe --PowerShellHistory  -vv
-} else {
-    Write-Host "[✗] Erreur : hoarder.exe introuvable dans releases/"
-    exit
-}
+# Dossier où Hoarder est situé
+$cheminReleases = "$cheminProjet\releases"
 
-# === Étape 3 : Trouver le fichier ZIP généré ===
-$zipFile = Get-ChildItem -Path $cheminReleases -Filter *.zip |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+# Aller dans le dossier releases
+Set-Location $cheminReleases
 
-if (-Not $zipFile) {
-    Write-Host "[✗] Aucun fichier ZIP généré par Hoarder trouvé."
-    exit
-}
+# Exécuter Hoarder
+Write-Host "Exécution de Hoarder..."
+.\hoarder.exe -vv
 
-Write-Host "[✓] Fichier ZIP trouvé : $($zipFile.FullName)"
+# URL du serveur Django pour recevoir le fichier
+$Uri = "http://localhost:8000/upload_resultat/"
 
-# === Étape 4 : Lire le fichier en binaire ===
+# Chemin vers le dossier où Hoarder génère le fichier ZIP
+$HoarderFolder = "$env:USERPROFILE\Downloads\Hoarder\releases"
+
+# Trouver le fichier ZIP généré dans le dossier Hoarder
+$FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+# Vérifie si un fichier ZIP a été trouvé
+if ($FichierPath) {
+    Write-Host "Fichier trouvé : $($FichierPath.FullName)"
+    
+   # === Étape 4 : Lire le fichier en binaire ===
 $fileBytes = [System.IO.File]::ReadAllBytes($zipFile.FullName)
 $fileName = [System.IO.Path]::GetFileName($zipFile.FullName)
 $boundary = [System.Guid]::NewGuid().ToString()
