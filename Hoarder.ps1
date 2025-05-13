@@ -14,6 +14,9 @@ Set-Location $cheminReleases
 Write-Host "Exécution de Hoarder..."
 .\hoarder.exe --PowerShellHistory -vv
 
+# Définir le dossier contenant les fichiers ZIP générés
+$HoarderFolder = "$cheminReleases"
+
 # Trouver le dernier fichier ZIP
 $FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip |
     Sort-Object LastWriteTime -Descending |
