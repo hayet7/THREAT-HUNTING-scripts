@@ -1,47 +1,66 @@
-# Télécharger Hoarder depuis GitHub (si ce n'est pas déjà fait)
+# === Configuration ===
+$hoarderRepo = "https://github.com/DFIRKuiper/Hoarder.git"
 $cheminProjet = "$env:USERPROFILE\Downloads\Hoarder"
+$cheminReleases = "$cheminProjet\releases"
+$uploadUrl = "http://localhost:8000/upload_resultat/"  # À adapter si besoin
+
+# === Étape 1 : Cloner Hoarder s'il n'existe pas ===
 if (-Not (Test-Path $cheminProjet)) {
-    git clone https://github.com/DFIRKuiper/Hoarder.git $cheminProjet
+    Write-Host "[+] Clonage du dépôt Hoarder..."
+    git clone $hoarderRepo $cheminProjet
+} else {
+    Write-Host "[✓] Le dépôt Hoarder existe déjà."
 }
 
-# Dossier où Hoarder est situé
-$cheminReleases = "$cheminProjet\releases"
-
-# Aller dans le dossier releases
-Set-Location $cheminReleases
-
-# Exécuter Hoarder
-Write-Host "Exécution de Hoarder..."
-.\hoarder.exe -vv
-
-# URL du serveur Django pour recevoir le fichier
-$Uri = "http://localhost:8000/upload_resultat/"
-
-# Chemin vers le dossier où Hoarder génère le fichier ZIP
-$HoarderFolder = "$env:USERPROFILE\Downloads\Hoarder\releases"
-
-# Trouver le fichier ZIP généré dans le dossier Hoarder
-$FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-# Vérifie si un fichier ZIP a été trouvé
-if ($FichierPath) {
-    Write-Host "Fichier trouvé : $($FichierPath.FullName)"
-    
-    # Lire le fichier en binaire
-    $Fichier = Get-Content -Path $FichierPath.FullName -Encoding Byte
-
-    # Créer l'objet multipart/form-data pour envoyer le fichier
-    $Body = @{
-        fichier = [System.IO.MemoryStream]::new($Fichier)
-    }
-
-    # Envoyer le fichier à Django
-    try {
-        $response = Invoke-RestMethod -Uri $Uri -Method Post -ContentType "multipart/form-data" -Body $Body
-        Write-Host "Réponse du serveur Django : $($response)"
-    } catch {
-        Write-Host "Erreur lors de l'envoi du fichier : $_"
-    }
+# === Étape 2 : Exécuter hoarder.exe ===
+if (Test-Path "$cheminReleases\hoarder.exe") {
+    Write-Host "[+] Exécution de Hoarder..."
+    Set-Location $cheminReleases
+    .\hoarder.exe --PowerShellHistory  -vv
 } else {
-    Write-Host "Aucun fichier ZIP trouvé dans le dossier Hoarder"
+    Write-Host "[✗] Erreur : hoarder.exe introuvable dans releases/"
+    exit
+}
+
+# === Étape 3 : Trouver le fichier ZIP généré ===
+$zipFile = Get-ChildItem -Path $cheminReleases -Filter *.zip |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+
+if (-Not $zipFile) {
+    Write-Host "[✗] Aucun fichier ZIP généré par Hoarder trouvé."
+    exit
+}
+
+Write-Host "[✓] Fichier ZIP trouvé : $($zipFile.FullName)"
+
+# === Étape 4 : Lire le fichier en binaire ===
+$fileBytes = [System.IO.File]::ReadAllBytes($zipFile.FullName)
+$fileName = [System.IO.Path]::GetFileName($zipFile.FullName)
+$boundary = [System.Guid]::NewGuid().ToString()
+$LF = "`r`n"
+
+# Construction manuelle du body multipart/form-data
+$bodyLines = (
+    "--$boundary",
+    "Content-Disposition: form-data; name=`"fichier`"; filename=`"$fileName`"",
+    "Content-Type: application/zip$LF",
+    [System.Text.Encoding]::GetEncoding("iso-8859-1").GetString($fileBytes),
+    "--$boundary--$LF"
+) -join $LF
+
+$bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
+
+# === Étape 5 : Envoyer la requête HTTP ===
+$headers = @{
+    "Content-Type" = "multipart/form-data; boundary=$boundary"
+}
+
+Write-Host "[>] Envoi du fichier à $uploadUrl ..."
+try {
+    $response = Invoke-WebRequest -Uri $uploadUrl -Method Post -Body $bodyBytes -Headers $headers
+    Write-Host "[✓] Fichier envoyé avec succès."
+    Write-Host "Réponse : $($response.Content)"
+} catch {
+    Write-Host "[✗] Erreur lors de l'envoi : $_"
 }
