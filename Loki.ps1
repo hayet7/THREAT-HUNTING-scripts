@@ -64,7 +64,7 @@ if (Test-Path -Path $lokiExe) {
 }
 
 # Récupérer le rapport texte généré (dans USERPROFILE)
-$reportFile = Get-ChildItem -Path "$env:USERPROFILE" -Filter "loki_*.txt" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$reportFile = Get-ChildItem -Path "$env:USERPROFILE" -Filter "loki_*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 if ($reportFile -ne $null) {
     Write-Host "[+] Rapport trouvé : $($reportFile.FullName)"
