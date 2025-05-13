@@ -14,34 +14,42 @@ Set-Location $cheminReleases
 Write-Host "Exécution de Hoarder..."
 .\hoarder.exe --PowerShellHistory -vv
 
-# Définir le dossier contenant les fichiers ZIP générés
-$HoarderFolder = "$cheminReleases"
+# Envoi du fichier ZIP généré par Hoarder vers le serveur Django
 
-# Trouver le dernier fichier ZIP
-$FichierPath = Get-ChildItem -Path $HoarderFolder -Filter *.zip |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+# URL du serveur Django (à adapter si besoin)
+$url = "http://localhost:8000/upload_resultat/"
 
-# Vérifie si un fichier ZIP a été trouvé
-if ($FichierPath) {
-    Write-Host "[✓] Fichier trouvé : $($FichierPath.FullName)"
+# Trouver le fichier ZIP généré
+$zipPath = Get-ChildItem -Path $cheminReleases -Filter *.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
-    # URL de l'endpoint Django
-    $Uri = "http://localhost:8000/upload_resultat/"
+if ($zipPath) {
+    Write-Host "[+] Fichier ZIP trouvé : $($zipPath.FullName)"
 
-    # Construction du formulaire (multipart/form-data automatique)
-    $Form = @{
-        "fichier" = Get-Item $FichierPath.FullName
+    $fileBytes = [System.IO.File]::ReadAllBytes($zipPath.FullName)
+    $fileName = [System.IO.Path]::GetFileName($zipPath.FullName)
+    $boundary = [System.Guid]::NewGuid().ToString()
+    $LF = "`r`n"
+
+    $bodyLines = (
+        "--$boundary",
+        "Content-Disposition: form-data; name=`"fichier`"; filename=`"$fileName`"",
+        "Content-Type: application/zip$LF",
+        [System.Text.Encoding]::ASCII.GetString($fileBytes),
+        "--$boundary--$LF"
+    ) -join $LF
+
+    $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
+
+    $headers = @{
+        "Content-Type" = "multipart/form-data; boundary=$boundary"
     }
 
-    # Envoi avec Invoke-WebRequest
     try {
-        $response = Invoke-WebRequest -Uri $Uri -Method Post -Form $Form
-        Write-Host "[✓] Réponse du serveur Django : $($response.StatusCode) $($response.StatusDescription)"
-        Write-Host $response.Content
+        $response = Invoke-WebRequest -Uri $url -Method Post -Body $bodyBytes -Headers $headers
+        Write-Host "[+] ZIP envoyé avec succès au serveur Django."
     } catch {
-        Write-Host "[✗] Erreur lors de l'envoi : $_"
+        Write-Host "[✗] Erreur lors de l'envoi du ZIP. Détails : $_"
     }
 } else {
-    Write-Host "[✗] Aucun fichier ZIP trouvé dans $HoarderFolder"
+    Write-Host "[✗] Aucun fichier ZIP trouvé à envoyer."
 }
